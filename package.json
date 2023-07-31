@@ -1,0 +1,20 @@
+{
+	"name": "p5play-pro",
+	"author": "quinton-ashley <info@p5play.org>",
+	"description": "p5play pro",
+	"license": "CC BY-ND 4.0",
+	"main": "p5play-pro.min.js",
+	"homepage": "https://p5play.org",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/quinton-ashley/p5play-pro.git"
+	},
+	"scripts": {
+		"min": "minify p5play-pro.js > p5play-pro.min.js",
+		"v": "npm version patch --force",
+		"V": "npm version minor --force",
+		"version": "git add -A",
+		"postversion": "git push"
+	},
+	"version": "0.0.0"
+}
