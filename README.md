@@ -2,6 +2,10 @@
 
 An extension to p5play that adds professional game development features.
 
+This is a work in progress. Please support me on [Patreon][] to help me finish it!
+
+~No documented features yet.~
+
 Coming soon, [Patreon][] supporters will get access to:
 
 - an iOS app template for publishing games to the App Store
