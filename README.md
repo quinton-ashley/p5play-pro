@@ -2,9 +2,7 @@
 
 An extension to p5play that adds professional game development features.
 
-This is a work in progress. Please support me on [Patreon][] to help me finish it!
-
-~No documented features yet.~
+> This is a work in progress. Please support me on [Patreon][] to help me finish it! No documented features yet, I will announce them as they are added.
 
 Coming soon, [Patreon][] supporters will get access to:
 
