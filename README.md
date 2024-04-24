@@ -2,9 +2,7 @@
 
 > This is a work in progress. Please support p5play on [Patreon][] to help me finish it!
 
-> No documented features yet, I will announce them as they are added.
-
-An extension to p5play that adds professional game development features.
+An extension to p5play that adds professional game development features:
 
 - use highly optimized binary Netcode for multiplayer servers
 - display native ads using the iOS App Template

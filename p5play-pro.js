@@ -2,7 +2,7 @@
  * p5play-pro
  * @version 0.0
  * @author quinton-ashley
- * @license CC BY-NC-ND 4.0
+ * @license AGPL-3.0
  */
 p5.prototype.registerMethod('init', function p5playProInit() {
 	let $ = this;
@@ -11,19 +11,14 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 
 	this.Netcode = class {
 		/**
-		 * EXPERIMENTAL! Work in progress, not ready for public use yet.
-		 *
-		 * A `netcode` object is created automatically when p5play loads.
-		 *
-		 * online multiplayer games and servers.
-		 *
-		 * "Netcode is a blanket term most commonly used by
-		 * gamers relating to networking in online games, often referring to
-		 * synchronization issues between clients and servers. Players often
-		 * infer "bad netcodes" when they experience lag or when their inputs
-		 * are dropped." - Wikipedia
+		 * Experimental, work in progress! p5play's Netcode is a class that
+		 * makes it easier to create online multiplayer games and servers.
 		 */
 		constructor() {
+			/**
+			 * The types of properties that can be sent over the network
+			 * and their corresponding byte sizes.
+			 */
 			this.typeSizes = {
 				boolean: 1,
 				Uint8: 1,
@@ -36,10 +31,9 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 				Vec2: 4,
 				Float64: 8
 			};
-			this.player = 0;
 
 			// source: https://stackoverflow.com/a/32633586/3792062
-			this.encodeFloat16 = (function () {
+			this._encodeFloat16 = (function () {
 				let fv = new Float32Array(1);
 				let iv = new Int32Array(fv.buffer);
 				return function toHalf(v) {
@@ -67,7 +61,7 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 		}
 
 		// source: https://stackoverflow.com/a/8796597/3792062
-		decodeFloat16(b) {
+		_decodeFloat16(b) {
 			let e = (b & 0x7c00) >> 10,
 				f = b & 0x03ff;
 			return (
@@ -76,21 +70,22 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			);
 		}
 
-		connect() {}
-
-		disconnect() {}
-
 		/**
-		 * Converts a sprite to a binary representation, which is smaller
+		 * Converts a sprite to a byte array representation, which is smaller
 		 * than serializing the data with JSON.stringify.
 		 *
 		 * This function is intended to be used to send sprite data over
 		 * a network.
 		 *
-		 * @param {Sprite} sprite
-		 * to binary. Defaults to all sprite properties.
+		 * Only sprite properties that have been modified since the last call
+		 * to this function will be included in the byte array. If the sprite
+		 * has not been modified since the last call, this function will
+		 * return null.
+		 *
+		 * @param {Sprite} sprite - the sprite to convert
+		 * @returns {Uint8Array} byte array representation of the sprite's updated properties or null
 		 */
-		spriteToBinary(sprite) {
+		spriteToBytes(sprite) {
 			const props = $.Sprite.props;
 
 			// initial size is 2 bytes for sprite id and 1 for the ending byte
@@ -115,7 +110,7 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 
 			const buffer = new ArrayBuffer(size);
 			const data = new DataView(buffer);
-			data.setFloat16 = (o, v) => data.setUint16(o, this.encodeFloat16(v));
+			data.setFloat16 = (o, v) => data.setUint16(o, this._encodeFloat16(v));
 
 			data.setUint16(0, sprite._uid);
 
@@ -185,39 +180,38 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			return new Uint8Array(buffer);
 		}
 
-		spriteToBlob(sprite) {
-			const binary = this.spriteToBinary(sprite);
-			return new Blob([binary]);
-		}
-
 		/**
-		 * Converts binary data, assigning the values to an existing sprite,
+		 * Converts a byte array, assigning the values to an existing sprite,
 		 * found using the sprite's uid, or creates a new sprite.
 		 *
-		 * @param {Uint8Array} binary - binary data
-		 * @param {number} [offset] - byte offset
+		 * @param {Uint8Array} bytes - byte array or DataView containing sprite data
 		 * @returns {Sprite} the sprite
 		 */
-		binaryToSprite(binary, offset) {
+		bytesToSprite(bytes) {
 			let data;
-			if (binary instanceof DataView) data = binary;
-			else data = new DataView(binary.buffer);
+			if (bytes instanceof DataView) data = bytes;
+			else data = new DataView(bytes.buffer);
 
-			data.getFloat16 = (o) => this.decodeFloat16(data.getUint16(o));
+			data.getFloat16 = (o) => this._decodeFloat16(data.getUint16(o));
 
-			let o = offset || 0;
+			let o = data.offset || 0;
 
 			let uid = data.getUint16(o);
 			o += 2;
 			let sprite = $.p5play.sprites[uid] || new $.Sprite();
 
-			while (o !== data.byteLength) {
+			while (o < data.byteLength) {
 				const propId = data.getUint8(o);
-				if (propId === 255) break;
 				o += 1;
+				if (propId === 255) break;
 
 				const prop = $.Sprite.props[propId];
 				const type = $.Sprite.propTypes[prop];
+
+				if (!prop || !type) {
+					console.error(`Unknown property type: ${propId}`);
+					break;
+				}
 
 				if (type === 'boolean') {
 					sprite[prop] = data.getUint8(o) !== 0;
@@ -266,19 +260,88 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			return sprite;
 		}
 
-		async blobToSprite(blob, offset) {
-			const arrayBuffer = await blob.arrayBuffer();
-			const uint8Array = new Uint8Array(arrayBuffer);
-			return this.binaryToSprite(uint8Array, offset);
+		/**
+		 * @returns {Uint8Array} byte array representation of the world
+		 */
+		worldToBytes() {
+			let worldData = [];
+			let size = 0;
+
+			for (let uid in $.p5play.sprites) {
+				let sprite = $.p5play.sprites[uid];
+				let spriteBytes = this.spriteToBytes(sprite);
+				if (spriteBytes) {
+					worldData.push(spriteBytes);
+					size += spriteBytes.length;
+				}
+			}
+
+			let worldBytes = new Uint8Array(size);
+			let offset = 0;
+
+			for (let spriteBytes of worldData) {
+				worldBytes.set(spriteBytes, offset);
+				offset += spriteBytes.length;
+			}
+
+			return worldBytes;
+		}
+
+		/**
+		 * Creates or updates sprites from a byte array
+		 * @param {Uint8Array} bytes - byte array containing a world update
+		 * @returns sprites
+		 */
+		bytesToWorld(bytes) {
+			let sprites = [];
+			let data = new DataView(bytes.buffer);
+			data.offset = 0;
+
+			while (data.offset < bytes.byteLength) {
+				let sprite = this.bytesToSprite(data);
+				sprites.push(sprite);
+			}
+
+			return sprites;
+		}
+
+		spriteToBlob(sprite) {
+			const bytes = this.spriteToBytes(sprite);
+			return new Blob([bytes], { type: 'application/octet-stream' });
+		}
+
+		async blobToSprite(blob) {
+			const bytes = new Uint8Array(await blob.arrayBuffer());
+			return this.bytesToSprite(bytes);
+		}
+
+		worldToBlob() {
+			let bytes = this.worldToBytes();
+			return new Blob([bytes.buffer], { type: 'application/octet-stream' });
+		}
+
+		async blobToWorld(blob) {
+			let bytes = new Uint8Array(await blob.arrayBuffer());
+			return this.bytesToWorld(bytes);
 		}
 
 		inputToJSON() {}
 	};
 
+	/**
+	 * A `netcode` object is created automatically when p5play loads.
+	 * It contains functions that can be used to efficiently send and
+	 * receive game data over a network.
+	 * @type {Netcode}
+	 */
 	this.netcode = new this.Netcode();
 
 	/* ADS */
 
+	/**
+	 * Load native ads on mobile
+	 * @param {*} opt
+	 */
 	this.loadAds = (opt) => {
 		opt ??= {};
 		// iOS
@@ -287,6 +350,10 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 		}
 	};
 
+	/**
+	 * Show native ads on mobile
+	 * @param {string} [type] - currently only 'interstitial' ads are supported
+	 */
 	this.showAd = (type) => {
 		if (type) type = type.toLowerCase();
 		type ??= 'interstitial';
