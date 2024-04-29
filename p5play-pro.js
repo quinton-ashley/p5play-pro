@@ -181,8 +181,8 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 		}
 
 		/**
-		 * Converts a byte array, assigning the values to an existing sprite,
-		 * found using the sprite's uid, or creates a new sprite.
+		 * Assigns sprite data to an existing sprite (with a matching id)
+		 * or creates a new sprite.
 		 *
 		 * @param {Uint8Array} bytes - byte array or DataView containing sprite data
 		 * @returns {Sprite} the sprite
@@ -288,7 +288,8 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 		}
 
 		/**
-		 * Creates or updates sprites from a byte array
+		 * Assigns sprite data to existing sprites (matching ids)
+		 * or creates new sprites to sync the world state.
 		 * @param {Uint8Array} bytes - byte array containing a world update
 		 * @returns sprites
 		 */
@@ -325,7 +326,25 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			return this.bytesToWorld(bytes);
 		}
 
-		inputToJSON() {}
+		/**
+		 * Encodes the world state so it can be efficiently sent over
+		 * a network. Alias for `worldToBytes`.
+		 * @returns {Uint8Array} byte array representation of the world
+		 */
+		encodeWorld() {
+			return this.worldToBytes();
+		}
+
+		/**
+		 * Syncs the world state.
+		 * @param {Blob} blob - byte array containing a world update
+		 * @returns {Promise} - resolves to an array of sprites
+		 */
+		syncWorld(blob) {
+			return this.blobToWorld(blob);
+		}
+
+		encodePlayerInput() {}
 	};
 
 	/**
