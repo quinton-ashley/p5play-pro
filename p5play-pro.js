@@ -1,6 +1,6 @@
 /**
  * p5play-pro
- * @version 0.0
+ * @version 0.0 BETA
  * @author quinton-ashley
  * @license AGPL-3.0
  */
@@ -11,7 +11,9 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 
 	this.Netcode = class {
 		/**
-		 * Experimental, work in progress! p5play's Netcode is a class that
+		 * Experimental, work in progress! Subject to change.
+		 *
+		 * p5play's Netcode is a class that
 		 * makes it easier to create online multiplayer games and servers.
 		 */
 		constructor() {
@@ -60,22 +62,27 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			})();
 		}
 
-		// source: https://stackoverflow.com/a/8796597/3792062
-		_decodeFloat16(b) {
-			let e = (b & 0x7c00) >> 10,
-				f = b & 0x03ff;
-			return (
-				(b >> 15 ? -1 : 1) *
-				(e ? (e === 0x1f ? (f ? NaN : Infinity) : Math.pow(2, e - 15) * (1 + f / 0x400)) : 6.103515625e-5 * (f / 0x400))
-			);
+		/**
+		 * Packs game state data so it can be efficiently sent over
+		 * a network.
+		 * @returns {Uint8Array} byte array representation of the game state
+		 */
+		pack() {
+			return this.spritesToBytes($.p5play.sprites);
+		}
+
+		/**
+		 * Unpacks game state data and applies it, updating the game state.
+		 * @param {Blob} blob - byte array containing a game state update
+		 * @returns {Promise} - resolves to an array of sprites
+		 */
+		unpack(blob) {
+			return this.blobToSprites(blob);
 		}
 
 		/**
 		 * Converts a sprite to a byte array representation, which is smaller
 		 * than serializing the data with JSON.stringify.
-		 *
-		 * This function is intended to be used to send sprite data over
-		 * a network.
 		 *
 		 * Only sprite properties that have been modified since the last call
 		 * to this function will be included in the byte array. If the sprite
@@ -261,39 +268,40 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 		}
 
 		/**
-		 * @returns {Uint8Array} byte array representation of the world
+		 * @param {Sprite[]} sprites
+		 * @returns {Uint8Array} byte array representation of sprites
 		 */
-		worldToBytes() {
-			let worldData = [];
+		spritesToBytes(sprites) {
+			let data = [];
 			let size = 0;
 
-			for (let uid in $.p5play.sprites) {
-				let sprite = $.p5play.sprites[uid];
+			for (let uid in sprites) {
+				let sprite = sprites[uid];
 				let spriteBytes = this.spriteToBytes(sprite);
 				if (spriteBytes) {
-					worldData.push(spriteBytes);
+					data.push(spriteBytes);
 					size += spriteBytes.length;
 				}
 			}
 
-			let worldBytes = new Uint8Array(size);
+			let bytes = new Uint8Array(size);
 			let offset = 0;
 
-			for (let spriteBytes of worldData) {
-				worldBytes.set(spriteBytes, offset);
+			for (let spriteBytes of data) {
+				bytes.set(spriteBytes, offset);
 				offset += spriteBytes.length;
 			}
 
-			return worldBytes;
+			return bytes;
 		}
 
 		/**
 		 * Assigns sprite data to existing sprites (matching ids)
-		 * or creates new sprites to sync the world state.
-		 * @param {Uint8Array} bytes - byte array containing a world update
-		 * @returns sprites
+		 * or creates new sprites to update the game state.
+		 * @param {Uint8Array} bytes - byte array containing sprites
+		 * @returns {Sprite[]} sprites
 		 */
-		bytesToWorld(bytes) {
+		bytesToSprites(bytes) {
 			let sprites = [];
 			let data = new DataView(bytes.buffer);
 			data.offset = 0;
@@ -316,35 +324,27 @@ p5.prototype.registerMethod('init', function p5playProInit() {
 			return this.bytesToSprite(bytes);
 		}
 
-		worldToBlob() {
-			let bytes = this.worldToBytes();
+		spritesToBlob(sprites) {
+			let bytes = this.spritesToBytes(sprites);
 			return new Blob([bytes.buffer], { type: 'application/octet-stream' });
 		}
 
-		async blobToWorld(blob) {
+		async blobToSprites(blob) {
 			let bytes = new Uint8Array(await blob.arrayBuffer());
-			return this.bytesToWorld(bytes);
-		}
-
-		/**
-		 * Encodes the world state so it can be efficiently sent over
-		 * a network. Alias for `worldToBytes`.
-		 * @returns {Uint8Array} byte array representation of the world
-		 */
-		encodeWorld() {
-			return this.worldToBytes();
-		}
-
-		/**
-		 * Syncs the world state.
-		 * @param {Blob} blob - byte array containing a world update
-		 * @returns {Promise} - resolves to an array of sprites
-		 */
-		syncWorld(blob) {
-			return this.blobToWorld(blob);
+			return this.bytesToSprites(bytes);
 		}
 
 		encodePlayerInput() {}
+
+		// source: https://stackoverflow.com/a/8796597/3792062
+		_decodeFloat16(b) {
+			let e = (b & 0x7c00) >> 10,
+				f = b & 0x03ff;
+			return (
+				(b >> 15 ? -1 : 1) *
+				(e ? (e === 0x1f ? (f ? NaN : Infinity) : Math.pow(2, e - 15) * (1 + f / 0x400)) : 6.103515625e-5 * (f / 0x400))
+			);
+		}
 	};
 
 	/**

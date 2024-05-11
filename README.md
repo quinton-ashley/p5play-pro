@@ -7,4 +7,8 @@ An extension to p5play that adds professional game development features:
 - use highly optimized binary Netcode for multiplayer servers
 - display native ads using the iOS App Template
 
+## Netcode Planning
+
+https://docs.google.com/document/d/11oR-BbNc_EgZ6p3tVxmA5Aa9fN9JGZPtn7VV4bjAVZI/edit?usp=sharing
+
 [Patreon]: https://www.patreon.com/p5play
